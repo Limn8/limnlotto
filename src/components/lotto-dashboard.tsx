@@ -66,12 +66,12 @@ export function LottoDashboard({
   const [descending, setDescending] = useState(false);
   const [tab, setTab] = useState("numbers");
   const sortedStats = sortNumberStats(stats, sortKey, descending);
-  const maxValue = Math.max(
-    ...sortedStats.map((stat) =>
-      typeof stat[sortKey] === "number" ? Number(stat[sortKey]) : 0,
-    ),
-    1,
+  const numericValues = sortedStats.map((stat) =>
+    typeof stat[sortKey] === "number" ? Number(stat[sortKey]) : 0,
   );
+  const maxValue = Math.max(...numericValues, 1);
+  const minValue = Math.min(...numericValues, 0);
+  const valueRange = Math.max(maxValue - minValue, 1);
   const latestDraw = draws.at(-1);
   const recentDraws = [...draws].reverse().slice(0, 8);
   const topByFrequency = [...stats]
@@ -88,13 +88,41 @@ export function LottoDashboard({
 
   return (
     <div className="page-shell">
+      <Card className="overflow-hidden border-red-300 bg-red-50/95">
+        <CardHeader className="border-b border-red-200/80 bg-gradient-to-r from-red-100 via-red-50 to-orange-50">
+          <Badge className="w-fit bg-red-600 text-white hover:bg-red-600">
+            중요 안내
+          </Badge>
+          <CardTitle className="font-[var(--font-display)] text-2xl text-red-900">
+            교육용 통계 실험 안내문
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 p-6 text-sm leading-7 text-red-950 md:text-base">
+          <p>
+            아시다시피 로또의 각 회차는 독립 시행이며 각 공이 뽑힐 확률은 수학적으로
+            동일하고 이 사이트는 수학 수업 교육용 흥미 유발을 위한 사이트일뿐 투기나
+            도박성 복권 구매를 권유하는 사이트가 절대 아닙니다.
+          </p>
+          <p>
+            본 사이트의 정보를 활용하여 발생하는 모든 결과의 책임은 본인에게 있으며,
+            이런저런 분석을 해도 실제 당첨으로 이어지지는 않는다는 사실을 체험하는 것이
+            이 사이트의 궁극적인 목표입니다.
+          </p>
+          <p>
+            그래도 혹시나 당첨이 되시면 인증샷 하나 정도는 보내주십시오. 로또 번호 및
+            정보 크롤링은 <strong>smok95.github.io/lotto</strong>에서 가져왔기 때문에
+            다소 자료가 부정확할 수 있습니다.
+          </p>
+        </CardContent>
+      </Card>
+
       <Card className="overflow-hidden">
         <CardContent className="grid gap-8 p-8 lg:grid-cols-[1.5fr_0.9fr]">
           <div className="space-y-5">
-            <Badge className="w-fit">림팔라 로또분석 놀이터(이상한사이트아님;)</Badge>
+            <Badge className="w-fit">인공지능 수학</Badge>
             <div className="space-y-4">
               <h1 className="font-[var(--font-display)] text-5xl leading-none tracking-[-0.06em] text-stone-950 md:text-7xl">
-                같이 나오는 번호까지 읽어보는 림팔라 로또분석 놀이터
+                림팔라 로또분석 놀이터(이상한사이트아님;)
               </h1>
               <p className="max-w-2xl text-base leading-7 text-stone-600 md:text-lg">
                 번호순 막대그래프부터 최대 연속 출현, 최근 추세, 미출현 구간, 1등
@@ -108,7 +136,7 @@ export function LottoDashboard({
               <Badge variant="secondary">보너스 번호 포함 통계</Badge>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Button asChild>
+              <Button asChild className="text-white">
                 <Link href="/draws">회차 순 번호 보기</Link>
               </Button>
               <Button variant="outline" asChild>
@@ -267,27 +295,30 @@ export function LottoDashboard({
             </CardHeader>
             <CardContent className="space-y-5 p-6">
               <div className="rounded-3xl border border-stone-200/80 bg-stone-50/80 p-4">
-                <div className="number-bar-chart">
-                  {sortedStats.map((stat) => {
-                    const numericValue =
-                      typeof stat[sortKey] === "number" ? Number(stat[sortKey]) : 0;
-                    const height = Math.max((numericValue / maxValue) * 100, 6);
+                <div className="number-bar-scroll">
+                  <div className="number-bar-chart">
+                    {sortedStats.map((stat) => {
+                      const numericValue =
+                        typeof stat[sortKey] === "number" ? Number(stat[sortKey]) : 0;
+                      const normalized = (numericValue - minValue) / valueRange;
+                      const height = 18 + Math.pow(normalized, 0.72) * 82;
 
-                    return (
-                      <div key={`column-${stat.number}`} className="number-bar-column">
-                        <div className="number-bar-value">
-                          {formatMetric(sortKey, stat)}
+                      return (
+                        <div key={`column-${stat.number}`} className="number-bar-column">
+                          <div className="number-bar-value">
+                            {formatMetric(sortKey, stat)}
+                          </div>
+                          <div className="number-bar-track">
+                            <div
+                              className={`number-bar-fill ${ballTone(stat.number)}`}
+                              style={{ height: `${height}%` }}
+                            />
+                          </div>
+                          <div className="number-bar-label">{stat.number}</div>
                         </div>
-                        <div className="number-bar-track">
-                          <div
-                            className={`number-bar-fill ${ballTone(stat.number)}`}
-                            style={{ height: `${height}%` }}
-                          />
-                        </div>
-                        <div className="number-bar-label">{stat.number}</div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
@@ -304,7 +335,8 @@ export function LottoDashboard({
               {sortedStats.map((stat) => {
                 const numericValue =
                   typeof stat[sortKey] === "number" ? Number(stat[sortKey]) : 0;
-                const width = Math.max((numericValue / maxValue) * 100, 4);
+                const normalized = (numericValue - minValue) / valueRange;
+                const width = 12 + Math.pow(normalized, 0.78) * 88;
                 return (
                   <div key={stat.number} className="grid gap-3 rounded-2xl border border-stone-200/70 bg-stone-50/70 p-3 md:grid-cols-[140px_minmax(0,1fr)_88px] md:items-center">
                     <div className="flex items-center gap-3">
