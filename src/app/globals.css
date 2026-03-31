@@ -449,8 +449,23 @@ input[type="number"] {
 }
 
 .store-map-viewport {
+  position: relative;
   overflow: auto;
   border-radius: 20px;
+}
+
+.store-map-tooltip {
+  position: absolute;
+  pointer-events: none;
+  transform: translateY(-100%);
+  border-radius: 999px;
+  background: rgba(21, 21, 21, 0.9);
+  color: white;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 7px 10px;
+  white-space: nowrap;
+  box-shadow: 0 8px 20px rgba(15, 15, 15, 0.18);
 }
 
 .store-map-svg {
@@ -472,6 +487,7 @@ input[type="number"] {
   stroke: rgba(255, 255, 255, 0.88);
   stroke-width: 0.8;
   opacity: 0.92;
+  cursor: pointer;
 }
 
 .network-link {

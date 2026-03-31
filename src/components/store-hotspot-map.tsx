@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import type { WinningStoreSpot } from "@/lib/lotto";
 
@@ -47,12 +47,29 @@ type StoreHotspotMapProps = {
 
 export function StoreHotspotMap({ hotspots }: StoreHotspotMapProps) {
   const [zoom, setZoom] = useState(1);
+  const [hoveredSpot, setHoveredSpot] = useState<{ hitCount: number; x: number; y: number } | null>(
+    null,
+  );
+  const viewportRef = useRef<HTMLDivElement | null>(null);
 
   const layeredHotspots = useMemo(
     () => [...hotspots].sort((left, right) => left.hitCount - right.hitCount),
     [hotspots],
   );
   const maxHitCount = Math.max(...hotspots.map((spot) => spot.hitCount), 1);
+
+  function updateTooltipPosition(clientX: number, clientY: number, hitCount: number) {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+
+    const rect = viewport.getBoundingClientRect();
+
+    setHoveredSpot({
+      hitCount,
+      x: clientX - rect.left + 12,
+      y: clientY - rect.top - 10,
+    });
+  }
 
   return (
     <div className="store-map-panel">
@@ -83,7 +100,7 @@ export function StoreHotspotMap({ hotspots }: StoreHotspotMapProps) {
         </div>
       </div>
 
-      <div className="store-map-viewport">
+      <div ref={viewportRef} className="store-map-viewport">
         <svg
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
           className="store-map-svg"
@@ -120,13 +137,28 @@ export function StoreHotspotMap({ hotspots }: StoreHotspotMapProps) {
                   r={radius}
                   fill={hotspotFill(spot.hitCount)}
                   className="store-hotspot"
+                  onMouseEnter={(event) =>
+                    updateTooltipPosition(event.clientX, event.clientY, spot.hitCount)
+                  }
+                  onMouseMove={(event) =>
+                    updateTooltipPosition(event.clientX, event.clientY, spot.hitCount)
+                  }
+                  onMouseLeave={() => setHoveredSpot(null)}
                 >
-                  <title>{`${spot.hitCount}회 당첨`}</title>
                 </circle>
               </g>
             );
           })}
         </svg>
+
+        {hoveredSpot ? (
+          <div
+            className="store-map-tooltip"
+            style={{ left: hoveredSpot.x, top: hoveredSpot.y }}
+          >
+            {hoveredSpot.hitCount}회 당첨
+          </div>
+        ) : null}
       </div>
     </div>
   );
