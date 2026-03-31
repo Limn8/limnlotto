@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { BarChart3, CalendarRange, ChartColumnBig, Trophy } from "lucide-react";
+import { BarChart3, CalendarRange, ChartColumnBig, CircleHelp, Trophy, X } from "lucide-react";
 
 import { MockLottoSimulator } from "@/components/mock-lotto-simulator";
 import { NumberNetworkMap } from "@/components/number-network-map";
@@ -70,6 +70,7 @@ export function LottoDashboard({
   const [descending, setDescending] = useState(false);
   const [tab, setTab] = useState("numbers");
   const [showDetailBars, setShowDetailBars] = useState(false);
+  const [showMetricGuide, setShowMetricGuide] = useState(false);
   const sortedStats = sortNumberStats(stats, sortKey, descending);
   const numericValues = sortedStats.map((stat) =>
     typeof stat[sortKey] === "number" ? Number(stat[sortKey]) : 0,
@@ -304,6 +305,15 @@ export function LottoDashboard({
                       </SelectContent>
                     </Select>
                   </div>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    type="button"
+                    aria-label="정렬 기준 설명 보기"
+                    onClick={() => setShowMetricGuide(true)}
+                  >
+                    <CircleHelp className="size-4" />
+                  </Button>
                   <Button variant="outline" onClick={() => setDescending((current) => !current)}>
                     {descending ? "내림차순" : "오름차순"}
                   </Button>
@@ -548,6 +558,72 @@ export function LottoDashboard({
           경기이음온학교 임현우
         </a>
       </p>
+
+      {showMetricGuide ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/45 p-4">
+          <div className="max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-stone-200 bg-white shadow-2xl">
+            <div className="sticky top-0 flex items-center justify-between border-b border-stone-200 bg-white/95 px-6 py-4 backdrop-blur">
+              <div>
+                <h2 className="font-[var(--font-display)] text-2xl text-stone-950">
+                  정렬 기준 설명
+                </h2>
+                <p className="mt-1 text-sm text-stone-500">
+                  각 지표가 무엇을 의미하는지와 점수 계산 방식을 정리했습니다.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="icon"
+                type="button"
+                onClick={() => setShowMetricGuide(false)}
+                aria-label="설명 닫기"
+              >
+                <X className="size-4" />
+              </Button>
+            </div>
+
+            <div className="space-y-6 px-6 py-5">
+              {sortOptions.map((option) => (
+                <div key={option.key} className="rounded-2xl border border-stone-200/80 bg-stone-50/70 p-4">
+                  <h3 className="text-lg font-semibold text-stone-900">{option.label}</h3>
+                  <p className="mt-2 text-sm leading-6 text-stone-600">{option.description}</p>
+                  {option.key === "momentumScore" ? (
+                    <p className="mt-3 text-sm leading-6 text-stone-700">
+                      계산 방법: 최근 10회 출현률 × 0.6 + 최근 30회 출현률 × 0.4 - 장기 평균 출현률입니다.
+                      값이 클수록 최근 빈도가 평소보다 강한 번호이고, 음수로 내려갈수록 최근 흐름이 약한 번호입니다.
+                    </p>
+                  ) : null}
+                  {option.key === "stabilityScore" ? (
+                    <p className="mt-3 text-sm leading-6 text-stone-700">
+                      계산 방법: 번호가 다시 나오기까지 걸린 간격들의 표준편차가 작을수록 높은 점수를 주는 방식입니다.
+                      즉 등장 간격이 들쭉날쭉하지 않고 비교적 일정한 번호일수록 안정성 점수가 높아집니다.
+                    </p>
+                  ) : null}
+                  {option.key === "averageGap" ? (
+                    <p className="mt-3 text-sm leading-6 text-stone-700">
+                      계산 방법: 해당 번호가 나온 회차들 사이 간격의 평균입니다. 값이 낮을수록 비교적 자주 다시 나온 번호로 볼 수 있습니다.
+                    </p>
+                  ) : null}
+                  {option.key === "gapStdDev" ? (
+                    <p className="mt-3 text-sm leading-6 text-stone-700">
+                      계산 방법: 등장 간격들의 표준편차입니다. 값이 클수록 어떤 때는 빨리 나오고 어떤 때는 오래 쉬는 식으로 간격 변동성이 큰 번호입니다.
+                    </p>
+                  ) : null}
+                  {option.key === "bonusBias" ? (
+                    <p className="mt-3 text-sm leading-6 text-stone-700">
+                      계산 방법: 전체 등장 중 보너스 번호로 등장한 비율입니다. 메인 번호보다 보너스로 더 자주 잡히는 경향이 있는지 보는 참고용 지표입니다.
+                    </p>
+                  ) : null}
+                </div>
+              ))}
+
+              <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4 text-sm leading-6 text-stone-700">
+                점수형 지표는 어디까지나 과거 데이터의 요약값입니다. 값이 높다고 해서 다음 회차 당첨 확률이 더 높아지는 것은 아니고, 통계적 특징을 비교해보는 교육용 지표로 보는 것이 맞습니다.
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -353,7 +353,7 @@ input[type="number"] {
   line-height: 1;
   color: var(--ink-soft);
   writing-mode: vertical-rl;
-  transform: rotate(180deg);
+  text-orientation: mixed;
   height: 44px;
   text-align: center;
 }
