@@ -28,6 +28,14 @@ type EvaluatedTicket = Ticket & {
 
 const STORAGE_KEY = "lottostat.mockTickets";
 
+function ballTone(number: number) {
+  if (number <= 10) return "ball-yellow";
+  if (number <= 20) return "ball-blue";
+  if (number <= 30) return "ball-red";
+  if (number <= 40) return "ball-gray";
+  return "ball-green";
+}
+
 function buildSuggestedTicket(stats: NumberStat[]) {
   return [...stats]
     .sort((left, right) => {
@@ -179,7 +187,7 @@ export function MockLottoSimulator({
             </div>
             <div className="flex flex-wrap gap-2">
               {selectedNumbers.map((value) => (
-                <span key={value} className="lotto-ball">
+                <span key={value} className={`lotto-ball ${ballTone(value)}`}>
                   {value}
                 </span>
               ))}
@@ -211,7 +219,7 @@ export function MockLottoSimulator({
                     </Badge>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {ticket.numbers.map((value) => (
-                        <span key={value} className="lotto-ball">
+                        <span key={value} className={`lotto-ball ${ballTone(value)}`}>
                           {value}
                         </span>
                       ))}

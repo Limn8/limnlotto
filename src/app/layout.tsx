@@ -15,7 +15,7 @@ const displayFont = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "로또 6/45 통계 시각화 사이트",
+  title: "림팔라 로또분석 놀이터(이상한사이트아님;)",
   description:
     "동행복권 로또 6/45의 당첨번호 통계, 회차별 조회, 추천 조합, 모의 구매 기능을 제공하는 시각화 사이트",
 };

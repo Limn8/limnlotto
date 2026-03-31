@@ -84,6 +84,19 @@ export type DrawShape = {
   rangeWidth: number;
 };
 
+export type NumberConnection = {
+  source: number;
+  target: number;
+  count: number;
+  normalizedWeight: number;
+};
+
+export type NumberNeighborhood = {
+  number: number;
+  totalConnectionCount: number;
+  strongestLinks: NumberConnection[];
+};
+
 export const sortOptions: Array<{
   key: NumberSortKey;
   label: string;
@@ -372,6 +385,72 @@ export function buildDrawStats(draws: LottoDraw[]) {
     averageAutoWinners: Number(autoAverage.toFixed(2)),
     averageManualWinners: Number(manualAverage.toFixed(2)),
     averageSemiAutoWinners: Number(semiAutoAverage.toFixed(2)),
+  };
+}
+
+export function buildCoOccurrenceMap(draws: LottoDraw[]) {
+  const counts = Array.from({ length: 46 }, () => Array<number>(46).fill(0));
+
+  draws.forEach((draw) => {
+    const included = [...draw.numbers, draw.bonusNo].sort((a, b) => a - b);
+    for (let leftIndex = 0; leftIndex < included.length; leftIndex += 1) {
+      for (let rightIndex = leftIndex + 1; rightIndex < included.length; rightIndex += 1) {
+        const left = included[leftIndex];
+        const right = included[rightIndex];
+        counts[left][right] += 1;
+        counts[right][left] += 1;
+      }
+    }
+  });
+
+  let maxCount = 1;
+  const connections: NumberConnection[] = [];
+
+  for (let source = 1; source <= 45; source += 1) {
+    for (let target = source + 1; target <= 45; target += 1) {
+      const count = counts[source][target];
+      maxCount = Math.max(maxCount, count);
+      connections.push({
+        source,
+        target,
+        count,
+        normalizedWeight: 0,
+      });
+    }
+  }
+
+  const normalizedConnections = connections.map((connection) => ({
+    ...connection,
+    normalizedWeight: connection.count / maxCount,
+  }));
+
+  const neighborhoods: NumberNeighborhood[] = Array.from(
+    { length: 45 },
+    (_, index) => {
+      const number = index + 1;
+      const strongestLinks = normalizedConnections
+        .filter(
+          (connection) =>
+            connection.source === number || connection.target === number,
+        )
+        .sort((left, right) => right.count - left.count)
+        .slice(0, 8);
+
+      return {
+        number,
+        totalConnectionCount: strongestLinks.reduce(
+          (sum, connection) => sum + connection.count,
+          0,
+        ),
+        strongestLinks,
+      };
+    },
+  );
+
+  return {
+    connections: normalizedConnections,
+    neighborhoods,
+    maxCount,
   };
 }
 

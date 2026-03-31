@@ -5,6 +5,7 @@ import { useState } from "react";
 import { BarChart3, CalendarRange, ChartColumnBig, Trophy } from "lucide-react";
 
 import { MockLottoSimulator } from "@/components/mock-lotto-simulator";
+import { NumberNetworkMap } from "@/components/number-network-map";
 import { RecommendationLab } from "@/components/recommendation-lab";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ import {
   NumberSortKey,
   NumberStat,
   buildDrawStats,
+  buildCoOccurrenceMap,
   formatCompactNumber,
   formatKoreanDate,
   sortNumberStats,
@@ -82,16 +84,17 @@ export function LottoDashboard({
     .sort((left, right) => right.currentMissStreak - left.currentMissStreak)
     .slice(0, 5);
   const drawStats = buildDrawStats(draws);
+  const coOccurrenceMap = buildCoOccurrenceMap(draws);
 
   return (
     <div className="page-shell">
       <Card className="overflow-hidden">
         <CardContent className="grid gap-8 p-8 lg:grid-cols-[1.5fr_0.9fr]">
           <div className="space-y-5">
-            <Badge className="w-fit">로또 6/45 통계 실험실</Badge>
+            <Badge className="w-fit">림팔라 로또분석 놀이터(이상한사이트아님;)</Badge>
             <div className="space-y-4">
               <h1 className="font-[var(--font-display)] text-5xl leading-none tracking-[-0.06em] text-stone-950 md:text-7xl">
-                1회부터 최신 회차까지, 번호와 회차를 동시에 읽는 시각화 대시보드
+                같이 나오는 번호까지 읽어보는 림팔라 로또분석 놀이터
               </h1>
               <p className="max-w-2xl text-base leading-7 text-stone-600 md:text-lg">
                 번호순 막대그래프부터 최대 연속 출현, 최근 추세, 미출현 구간, 1등
@@ -114,15 +117,15 @@ export function LottoDashboard({
             </div>
           </div>
 
-          <Card className="border-stone-900 bg-stone-950 text-stone-50 shadow-none">
+          <Card className="border-orange-200 bg-gradient-to-br from-orange-50 via-amber-50 to-white text-stone-900 shadow-none">
             <CardHeader>
-              <Badge variant="outline" className="w-fit border-stone-700 text-stone-200">
+              <Badge variant="outline" className="w-fit border-orange-200 text-orange-900">
                 직전 회차 하이라이트
               </Badge>
-              <CardTitle className="font-[var(--font-display)] text-4xl text-stone-50">
+              <CardTitle className="font-[var(--font-display)] text-4xl text-stone-950">
                 {latestDraw?.drawNo ?? "-"}회
               </CardTitle>
-              <CardDescription className="text-stone-300">
+              <CardDescription className="text-stone-600">
                 {latestDraw ? formatKoreanDate(latestDraw.date) : "-"} 추첨
               </CardDescription>
             </CardHeader>
@@ -135,24 +138,24 @@ export function LottoDashboard({
                 ))}
                 {latestDraw ? (
                   <>
-                    <span className="flex items-center text-stone-300">+</span>
+                    <span className="flex items-center text-stone-500">+</span>
                     <span className={`lotto-ball ${ballTone(latestDraw.bonusNo)} bonus-ball`}>
                       {latestDraw.bonusNo}
                     </span>
                   </>
                 ) : null}
               </div>
-              <Separator className="bg-stone-800" />
+              <Separator className="bg-orange-150" />
               <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-2xl bg-stone-900 p-4">
-                  <p className="text-sm text-stone-400">1등 당첨금</p>
-                  <strong className="mt-2 block font-[var(--font-display)] text-2xl">
+                <div className="rounded-2xl border border-orange-100 bg-white/90 p-4">
+                  <p className="text-sm text-stone-500">1등 당첨금</p>
+                  <strong className="mt-2 block font-[var(--font-display)] text-2xl text-stone-950">
                     {formatCompactNumber(latestDraw?.divisions[0]?.prize ?? 0)}원
                   </strong>
                 </div>
-                <div className="rounded-2xl bg-stone-900 p-4">
-                  <p className="text-sm text-stone-400">1등 당첨자수</p>
-                  <strong className="mt-2 block font-[var(--font-display)] text-2xl">
+                <div className="rounded-2xl border border-orange-100 bg-white/90 p-4">
+                  <p className="text-sm text-stone-500">1등 당첨자수</p>
+                  <strong className="mt-2 block font-[var(--font-display)] text-2xl text-stone-950">
                     {formatCompactNumber(latestDraw?.divisions[0]?.winners ?? 0)}명
                   </strong>
                 </div>
@@ -161,6 +164,11 @@ export function LottoDashboard({
           </Card>
         </CardContent>
       </Card>
+
+      <NumberNetworkMap
+        connections={coOccurrenceMap.connections}
+        neighborhoods={coOccurrenceMap.neighborhoods}
+      />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Card>
@@ -257,7 +265,42 @@ export function LottoDashboard({
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="space-y-3 p-6">
+            <CardContent className="space-y-5 p-6">
+              <div className="rounded-3xl border border-stone-200/80 bg-stone-50/80 p-4">
+                <div className="number-bar-chart">
+                  {sortedStats.map((stat) => {
+                    const numericValue =
+                      typeof stat[sortKey] === "number" ? Number(stat[sortKey]) : 0;
+                    const height = Math.max((numericValue / maxValue) * 100, 6);
+
+                    return (
+                      <div key={`column-${stat.number}`} className="number-bar-column">
+                        <div className="number-bar-value">
+                          {formatMetric(sortKey, stat)}
+                        </div>
+                        <div className="number-bar-track">
+                          <div
+                            className={`number-bar-fill ${ballTone(stat.number)}`}
+                            style={{ height: `${height}%` }}
+                          />
+                        </div>
+                        <div className="number-bar-label">{stat.number}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <p className="text-sm leading-6 text-stone-500">
+                  세로 막대형 도표라서 번호별 상대적인 차이를 한 화면에서 빠르게 읽기
+                  좋습니다. 아래 목록은 같은 값을 카드형으로 다시 보여줘서 정확한 수치를
+                  확인하기 쉽게 둔 영역입니다.
+                </p>
+              </div>
+
               {sortedStats.map((stat) => {
                 const numericValue =
                   typeof stat[sortKey] === "number" ? Number(stat[sortKey]) : 0;

@@ -43,6 +43,14 @@ const rules: Array<{ key: RuleKey; label: string; description: string }> = [
   },
 ];
 
+function ballTone(number: number) {
+  if (number <= 10) return "ball-yellow";
+  if (number <= 20) return "ball-blue";
+  if (number <= 30) return "ball-red";
+  if (number <= 40) return "ball-gray";
+  return "ball-green";
+}
+
 function mulberry32(seed: number) {
   return function random() {
     let value = seed + 0x6d2b79f5;
@@ -336,7 +344,7 @@ export function RecommendationLab({
                 <CardContent>
                   <div className="flex flex-wrap gap-2">
                     {combo.map((value) => (
-                      <span key={value} className="lotto-ball">
+                      <span key={value} className={`lotto-ball ${ballTone(value)}`}>
                         {value}
                       </span>
                     ))}
