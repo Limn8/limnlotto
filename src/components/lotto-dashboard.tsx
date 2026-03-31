@@ -66,7 +66,7 @@ export function LottoDashboard({
   stats,
   generatedAt,
 }: LottoDashboardProps) {
-  const [sortKey, setSortKey] = useState<NumberSortKey>("number");
+  const [sortKey, setSortKey] = useState<NumberSortKey>("totalAppearances");
   const [descending, setDescending] = useState(false);
   const [tab, setTab] = useState("numbers");
   const [showDetailBars, setShowDetailBars] = useState(false);
@@ -141,7 +141,7 @@ export function LottoDashboard({
                 림팔라 로또분석 놀이터(이상한사이트아님;)
               </h1>
               <p className="max-w-2xl text-base leading-7 text-stone-600 md:text-lg">
-                번호순 막대그래프부터 최대 연속 출현, 최근 추세, 미출현 구간, 1등
+                번호별 막대그래프부터 최대 연속 출현, 최근 추세, 미출현 구간, 1등
                 당첨금과 자동·수동 비중, 조건 기반 추천 조합, 모의 구매 자동 채점까지
                 모두 한 곳에 모았습니다.
               </p>

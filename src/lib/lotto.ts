@@ -102,7 +102,6 @@ export const sortOptions: Array<{
   label: string;
   description: string;
 }> = [
-  { key: "number", label: "번호순", description: "1번부터 45번까지 정렬" },
   {
     key: "totalAppearances",
     label: "총 출현 횟수",
