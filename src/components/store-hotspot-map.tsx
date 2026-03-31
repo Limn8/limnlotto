@@ -30,10 +30,10 @@ function projectToMap(lat: number, lng: number) {
 }
 
 function hotspotFill(hitCount: number) {
-  if (hitCount >= 5) return "#b91c1c";
-  if (hitCount >= 4) return "#dc2626";
-  if (hitCount >= 3) return "#ea580c";
-  if (hitCount >= 2) return "#f59e0b";
+  if (hitCount >= 40) return "#d62828";
+  if (hitCount >= 30) return "#f97316";
+  if (hitCount >= 20) return "#facc15";
+  if (hitCount >= 10) return "#7c3aed";
   return "#2563eb";
 }
 
