@@ -152,8 +152,11 @@ export function LottoDashboard({
               <Badge variant="secondary">보너스 번호 포함 통계</Badge>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Button asChild className="text-white">
-                <Link href="/draws" className="text-white">
+              <Button
+                asChild
+                className="border border-stone-200 bg-white text-stone-900 shadow-sm hover:bg-stone-50"
+              >
+                <Link href="/draws" className="text-stone-900">
                   회차 순 번호 보기
                 </Link>
               </Button>
