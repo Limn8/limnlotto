@@ -1,53 +1,16 @@
 import Link from "next/link";
 
+import { StoreHotspotMap } from "@/components/store-hotspot-map";
 import {
   buildWinningStoreHotspots,
   formatKoreanDate,
   getWinningStoreDataset,
 } from "@/lib/lotto";
 
-const WIDTH = 760;
-const HEIGHT = 956;
-const MAP_IMAGE_FRAME = {
-  x: 94,
-  y: 50,
-  width: 520,
-  height: 756,
-};
-const BOUNDS = {
-  minLat: 33.0,
-  maxLat: 38.7,
-  minLng: 124.5,
-  maxLng: 131.0,
-};
-
-function projectToMap(lat: number, lng: number) {
-  const xRatio = (lng - BOUNDS.minLng) / (BOUNDS.maxLng - BOUNDS.minLng);
-  const yRatio = 1 - (lat - BOUNDS.minLat) / (BOUNDS.maxLat - BOUNDS.minLat);
-
-  return {
-    x: 92 + xRatio * (WIDTH - 198),
-    y: 118 + yRatio * (HEIGHT - 262),
-  };
-}
-
-function hotspotFill(hitCount: number) {
-  if (hitCount >= 5) return "#b91c1c";
-  if (hitCount >= 4) return "#dc2626";
-  if (hitCount >= 3) return "#ea580c";
-  if (hitCount >= 2) return "#f59e0b";
-  return "#2563eb";
-}
-
-function hotspotRadius(hitCount: number) {
-  return Math.min(9.5, 1.4 + Math.sqrt(hitCount) * 0.95);
-}
-
 export default function StoresPage() {
   const dataset = getWinningStoreDataset();
   const hotspots = buildWinningStoreHotspots(dataset.draws);
   const topHotspots = hotspots.slice(0, 8);
-  const maxHitCount = Math.max(...hotspots.map((spot) => spot.hitCount), 1);
 
   return (
     <div className="page-shell">
@@ -87,48 +50,7 @@ export default function StoresPage() {
         </div>
 
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.6fr)]">
-          <div className="store-map-panel">
-            <svg
-              viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-              className="store-map-svg"
-              role="img"
-              aria-label="대한민국 1등 배출점 지도"
-            >
-              <image
-                href="/south-korea-reference-map.jpg"
-                x={MAP_IMAGE_FRAME.x}
-                y={MAP_IMAGE_FRAME.y}
-                width={MAP_IMAGE_FRAME.width}
-                height={MAP_IMAGE_FRAME.height}
-                preserveAspectRatio="none"
-                className="korea-reference-map"
-              />
-
-              {hotspots.map((spot) => {
-                const point = projectToMap(spot.lat, spot.lng);
-                const radius = hotspotRadius(spot.hitCount);
-
-                return (
-                  <g key={spot.key}>
-                    <circle
-                      cx={point.x}
-                      cy={point.y}
-                      r={radius + 1.8}
-                      className="store-hotspot-glow"
-                      style={{ opacity: Math.min(0.08 + spot.hitCount / maxHitCount / 4.2, 0.24) }}
-                    />
-                    <circle
-                      cx={point.x}
-                      cy={point.y}
-                      r={radius}
-                      fill={hotspotFill(spot.hitCount)}
-                      className="store-hotspot"
-                    />
-                  </g>
-                );
-              })}
-            </svg>
-          </div>
+          <StoreHotspotMap hotspots={hotspots} />
 
           <div className="space-y-4">
             <div className="overview-card">

@@ -416,10 +416,48 @@ input[type="number"] {
   padding: 18px;
 }
 
+.store-map-toolbar,
+.store-map-controls {
+  display: flex;
+  align-items: center;
+}
+
+.store-map-toolbar {
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.store-map-toolbar span {
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+}
+
+.store-map-controls {
+  gap: 8px;
+}
+
+.store-map-button {
+  border: 1px solid rgba(28, 25, 23, 0.12);
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--foreground);
+  min-width: 42px;
+  height: 38px;
+  border-radius: 999px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.store-map-viewport {
+  overflow: auto;
+  border-radius: 20px;
+}
+
 .store-map-svg {
   width: 100%;
   height: auto;
   aspect-ratio: 760 / 956;
+  transition: transform 0.22s ease;
 }
 
 .korea-reference-map {
@@ -432,8 +470,8 @@ input[type="number"] {
 
 .store-hotspot {
   stroke: rgba(255, 255, 255, 0.88);
-  stroke-width: 1.5;
-  opacity: 0.62;
+  stroke-width: 0.8;
+  opacity: 0.92;
 }
 
 .network-link {
