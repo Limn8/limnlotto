@@ -1,7 +1,15 @@
 "use client";
 
-import type { CSSProperties } from "react";
-import { useMemo, useState } from "react";
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  forceCenter,
+  forceCollide,
+  forceLink,
+  forceManyBody,
+  forceRadial,
+  forceSimulation,
+} from "d3-force";
 
 import { Badge } from "@/components/ui/badge";
 import {
@@ -18,13 +26,30 @@ type NumberNetworkMapProps = {
   neighborhoods: NumberNeighborhood[];
 };
 
-type Point = {
+type GraphNode = {
   number: number;
   x: number;
   y: number;
-  strength: number;
+  vx?: number;
+  vy?: number;
+  fx?: number | null;
+  fy?: number | null;
+  radius: number;
   related: boolean;
+  connectionCount: number;
 };
+
+type GraphLink = {
+  source: number | GraphNode;
+  target: number | GraphNode;
+  count: number;
+  normalizedWeight: number;
+};
+
+const WIDTH = 760;
+const HEIGHT = 760;
+const CENTER_X = WIDTH / 2;
+const CENTER_Y = HEIGHT / 2;
 
 function ballTone(number: number) {
   if (number <= 10) return "ball-yellow";
@@ -39,8 +64,79 @@ function seeded(number: number, offset: number) {
   return value - Math.floor(value);
 }
 
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
+function linkBucket(count: number) {
+  if (count >= 30) return "tier-30";
+  if (count >= 20) return "tier-20";
+  if (count >= 10) return "tier-10";
+  return "tier-base";
+}
+
+function createInitialNodes(
+  selectedNumber: number,
+  selectedConnections: NumberConnection[],
+): GraphNode[] {
+  const connectionMap = new Map<number, NumberConnection>();
+
+  selectedConnections.forEach((connection) => {
+    const partner =
+      connection.source === selectedNumber ? connection.target : connection.source;
+    connectionMap.set(partner, connection);
+  });
+
+  return Array.from({ length: 45 }, (_, index) => {
+    const number = index + 1;
+    const angle = ((Math.PI * 2) / 45) * index - Math.PI / 2;
+    const connection = connectionMap.get(number);
+    const count = connection?.count ?? 0;
+    const related = number === selectedNumber || count > 0;
+
+    const radius =
+      number === selectedNumber
+        ? 24
+        : count >= 30
+          ? 18
+          : count >= 20
+            ? 16
+            : count >= 10
+              ? 14
+              : 12;
+
+    const orbit =
+      number === selectedNumber
+        ? 0
+        : related
+          ? count >= 30
+            ? 120
+            : count >= 20
+              ? 190
+              : count >= 10
+                ? 265
+                : 335
+          : 440 + seeded(number, 1) * 60;
+
+    return {
+      number,
+      x: CENTER_X + Math.cos(angle) * orbit,
+      y: CENTER_Y + Math.sin(angle) * orbit * 0.84,
+      radius,
+      related,
+      connectionCount: count,
+    };
+  });
+}
+
+function projectToEdge(source: GraphNode, target: GraphNode) {
+  const dx = target.x - source.x;
+  const dy = target.y - source.y;
+  const distance = Math.sqrt(dx * dx + dy * dy) || 1;
+  const padding = 2;
+
+  return {
+    x1: source.x + (dx / distance) * (source.radius + padding),
+    y1: source.y + (dy / distance) * (source.radius + padding),
+    x2: target.x - (dx / distance) * (target.radius + padding),
+    y2: target.y - (dy / distance) * (target.radius + padding),
+  };
 }
 
 export function NumberNetworkMap({
@@ -48,6 +144,14 @@ export function NumberNetworkMap({
   neighborhoods,
 }: NumberNetworkMapProps) {
   const [selectedNumber, setSelectedNumber] = useState(7);
+  const [nodes, setNodes] = useState<GraphNode[]>([]);
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const simulationRef = useRef<ReturnType<typeof forceSimulation<GraphNode>> | null>(
+    null,
+  );
+  const nodesRef = useRef<GraphNode[]>([]);
+  const dragNodeRef = useRef<GraphNode | null>(null);
+  const frameRef = useRef<number | null>(null);
 
   const selectedNeighborhood = neighborhoods.find(
     (item) => item.number === selectedNumber,
@@ -65,87 +169,157 @@ export function NumberNetworkMap({
     [connections, selectedNumber],
   );
 
-  const strengthMap = useMemo(() => {
-    const entries: Array<[number, number]> = selectedConnections.map((connection) => [
-      connection.source === selectedNumber ? connection.target : connection.source,
-      connection.normalizedWeight,
-    ]);
-    return new Map<number, number>(entries);
-  }, [selectedConnections, selectedNumber]);
-
-  const points = useMemo<Point[]>(() => {
-    return Array.from({ length: 45 }, (_, index) => {
-      const number = index + 1;
-      const strength = number === selectedNumber ? 1 : strengthMap.get(number) ?? 0;
-      const related = strength > 0;
-      const sectionIndex = Math.min(Math.floor((number - 1) / 10), 4);
-      const sectionCenters = [
-        { x: 34, y: 31 },
-        { x: 64, y: 28 },
-        { x: 71, y: 54 },
-        { x: 48, y: 70 },
-        { x: 25, y: 58 },
-      ];
-      const cluster = sectionCenters[sectionIndex];
-      const baseAngle = seeded(number, 1) * Math.PI * 2;
-      const sway = selectedNumber * 0.055 + seeded(number, 6) * 0.8;
-
-      if (number === selectedNumber) {
-        return {
-          number,
-          x: 50,
-          y: 48,
-          strength,
-          related: true,
-        };
-      }
-
-      if (related) {
-        const ring = 12 + (1 - strength) * 24;
-        const angle = baseAngle + sway;
-        const jitterX = (seeded(number, 2) - 0.5) * 4.5;
-        const jitterY = (seeded(number, 3) - 0.5) * 5;
-
-        return {
-          number,
-          x: clamp(50 + Math.cos(angle) * ring + jitterX, 10, 90),
-          y: clamp(48 + Math.sin(angle) * ring * 0.84 + jitterY, 12, 88),
-          strength,
-          related,
-        };
-      }
-
-      const driftAngle = baseAngle + sway * 0.6;
-      const push = 30 + seeded(number, 4) * 18;
-      const orbitX = Math.cos(driftAngle) * push;
-      const orbitY = Math.sin(driftAngle) * push * 0.82;
-      const settleX = (cluster.x - 50) * 0.34;
-      const settleY = (cluster.y - 48) * 0.34;
-
-      return {
-        number,
-        x: clamp(50 + orbitX + settleX, 7, 93),
-        y: clamp(48 + orbitY + settleY, 9, 91),
-        strength,
-        related,
-      };
-    });
-  }, [selectedNumber, strengthMap]);
-
-  const pointMap = useMemo(
-    () => new Map(points.map((point) => [point.number, point])),
-    [points],
+  const graphLinks = useMemo<GraphLink[]>(
+    () =>
+      selectedConnections.map((connection) => ({
+        source: connection.source,
+        target: connection.target,
+        count: connection.count,
+        normalizedWeight: connection.normalizedWeight,
+      })),
+    [selectedConnections],
   );
 
-  const visibleConnections = useMemo(
-    () => selectedConnections.slice(0, 12),
-    [selectedConnections],
+  const topPartners = useMemo(
+    () =>
+      selectedConnections.slice(0, 10).map((connection) =>
+        connection.source === selectedNumber ? connection.target : connection.source,
+      ),
+    [selectedConnections, selectedNumber],
+  );
+  const topPartnerSet = useMemo(() => new Set(topPartners), [topPartners]);
+
+  useEffect(() => {
+    const initialNodes: GraphNode[] = createInitialNodes(
+      selectedNumber,
+      selectedConnections,
+    );
+    nodesRef.current = initialNodes;
+    frameRef.current = window.requestAnimationFrame(() => {
+      frameRef.current = null;
+      setNodes([...initialNodes]);
+    });
+
+    const simulation = forceSimulation<GraphNode>(initialNodes)
+      .alpha(0.9)
+      .alphaDecay(0.08)
+      .velocityDecay(0.28)
+      .force("charge", forceManyBody<GraphNode>().strength((node) => (node.related ? -145 : -80)))
+      .force("center", forceCenter(CENTER_X, CENTER_Y))
+      .force(
+        "radial",
+        forceRadial<GraphNode>(
+          (node) =>
+            node.number === selectedNumber
+              ? 0
+              : node.related
+                ? node.connectionCount >= 30
+                  ? 95
+                  : node.connectionCount >= 20
+                    ? 150
+                    : node.connectionCount >= 10
+                      ? 220
+                      : 285
+                : 360,
+          CENTER_X,
+          CENTER_Y,
+        ).strength((node) => (node.related ? 0.34 : 0.18)),
+      )
+      .force(
+        "collision",
+        forceCollide<GraphNode>().radius((node) => node.radius + 8).strength(0.92),
+      )
+      .force(
+        "links",
+        forceLink<GraphNode, GraphLink>(graphLinks)
+          .id((node) => node.number)
+          .distance((link) => {
+            if (link.count >= 30) return 95;
+            if (link.count >= 20) return 150;
+            if (link.count >= 10) return 220;
+            return 300;
+          })
+          .strength((link) => {
+            if (link.count >= 30) return 0.78;
+            if (link.count >= 20) return 0.5;
+            if (link.count >= 10) return 0.3;
+            return 0.18;
+          }),
+      )
+      .on("tick", () => {
+        if (frameRef.current !== null) return;
+
+        frameRef.current = window.requestAnimationFrame(() => {
+          frameRef.current = null;
+          setNodes([...nodesRef.current]);
+        });
+      });
+
+    simulationRef.current = simulation;
+
+    return () => {
+      simulation.stop();
+      if (frameRef.current !== null) {
+        window.cancelAnimationFrame(frameRef.current);
+        frameRef.current = null;
+      }
+    };
+  }, [graphLinks, selectedConnections, selectedNumber]);
+
+  useEffect(() => {
+    const handlePointerMove = (event: PointerEvent) => {
+      if (!dragNodeRef.current || !stageRef.current) return;
+
+      const bounds = stageRef.current.getBoundingClientRect();
+      const ratioX = WIDTH / bounds.width;
+      const ratioY = HEIGHT / bounds.height;
+
+      dragNodeRef.current.fx = (event.clientX - bounds.left) * ratioX;
+      dragNodeRef.current.fy = (event.clientY - bounds.top) * ratioY;
+      simulationRef.current?.alphaTarget(0.22).restart();
+    };
+
+    const handlePointerUp = () => {
+      if (!dragNodeRef.current) return;
+
+      dragNodeRef.current.fx = null;
+      dragNodeRef.current.fy = null;
+      dragNodeRef.current = null;
+      simulationRef.current?.alphaTarget(0);
+    };
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, []);
+
+  const handlePointerDown = (
+    event: ReactPointerEvent<HTMLButtonElement>,
+    nodeNumber: number,
+  ) => {
+    const node = nodesRef.current.find((item) => item.number === nodeNumber);
+    if (!node) return;
+
+    dragNodeRef.current = node;
+    node.fx = node.x;
+    node.fy = node.y;
+    simulationRef.current?.alphaTarget(0.24).restart();
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const nodeMap = useMemo(
+    () => new Map(nodes.map((node) => [node.number, node])),
+    [nodes],
   );
 
   const strongestLink = selectedNeighborhood?.strongestLinks[0];
   const averageStrength =
-    visibleConnections.reduce((sum, connection) => sum + connection.normalizedWeight, 0) /
-    Math.max(visibleConnections.length, 1);
+    selectedConnections.reduce((sum, connection) => sum + connection.normalizedWeight, 0) /
+    Math.max(selectedConnections.length, 1);
 
   return (
     <Card className="overflow-hidden">
@@ -155,84 +329,113 @@ export function NumberNetworkMap({
           이 번호는 어떤 번호와 관계가 깊을까요?
         </CardTitle>
         <CardDescription>
-          공을 누르면 연관이 강한 번호는 더 가까이 뭉치고, 덜 관련된 번호는 바깥으로
-          밀려납니다.
+          공을 끌어볼 수 있고, 번호를 선택하면 관련 공은 가까이 모이고 관련 없는 공은
+          바깥으로 밀려납니다.
         </CardDescription>
       </CardHeader>
-      <CardContent className="grid gap-6 p-4 md:p-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.85fr)]">
-        <div className="network-stage">
-          <div className="network-haze network-haze-left" />
-          <div className="network-haze network-haze-right" />
-          <svg viewBox="0 0 100 100" className="network-svg" role="img" aria-label="로또 번호 연관 맵">
-            <circle cx="50" cy="48" r="17" className="network-field-ring strong" />
-            <circle cx="50" cy="48" r="29" className="network-field-ring" />
-            <circle cx="50" cy="48" r="42" className="network-field-ring faint" />
-            {visibleConnections.map((connection) => {
-              const source = pointMap.get(connection.source);
-              const target = pointMap.get(connection.target);
+      <CardContent className="grid gap-6 p-4 md:p-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.8fr)]">
+        <div className="space-y-4">
+          <div ref={stageRef} className="network-stage interactive">
+            <svg
+              viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+              className="network-svg"
+              role="img"
+              aria-label="로또 번호 연관 네트워크"
+            >
+              {graphLinks.map((link) => {
+                const sourceNumber =
+                  typeof link.source === "number" ? link.source : link.source.number;
+                const targetNumber =
+                  typeof link.target === "number" ? link.target : link.target.number;
+                const source = nodeMap.get(sourceNumber);
+                const target = nodeMap.get(targetNumber);
 
-              if (!source || !target) return null;
+                if (!source || !target) return null;
 
-              const partner =
-                connection.source === selectedNumber
-                  ? connection.target
-                  : connection.source;
-              const activeStrength = strengthMap.get(partner) ?? 0;
+                const line = projectToEdge(source, target);
+                const partner =
+                  sourceNumber === selectedNumber ? targetNumber : sourceNumber;
 
-              return (
-                <line
-                  key={`${connection.source}-${connection.target}`}
-                  x1={source.x}
-                  y1={source.y}
-                  x2={target.x}
-                  y2={target.y}
-                  className="network-link selected"
-                  style={{
-                    strokeWidth: `${1.5 + activeStrength * 3.8}px`,
-                    opacity: `${0.28 + activeStrength * 0.64}`,
-                  }}
-                />
-              );
-            })}
-          </svg>
+                return (
+                  <line
+                    key={`${sourceNumber}-${targetNumber}`}
+                    x1={line.x1}
+                    y1={line.y1}
+                    x2={line.x2}
+                    y2={line.y2}
+                    className={`network-link selected ${linkBucket(link.count)} ${topPartnerSet.has(partner) ? "top-10" : ""}`}
+                  />
+                );
+              })}
+            </svg>
 
-          <div className="network-node-layer">
-            {points.map((point) => {
-              const active = point.number === selectedNumber;
-              const strength = active ? 1 : point.strength;
-              const size = active
-                ? 3.8
-                : point.related
-                  ? 2.95 + strength * 1.25
-                  : 2.35;
+            <div className="network-node-layer">
+              {nodes.map((node) => {
+                const active = node.number === selectedNumber;
+                const size = `${node.radius * 2}px`;
 
-              return (
-                <button
-                  key={point.number}
-                  type="button"
-                  aria-pressed={active}
-                  aria-label={`${point.number}번 연관 번호 보기`}
-                  className={`network-node-button ${active ? "active" : point.related ? "related" : "muted"}`}
-                  style={{
-                    left: `${point.x}%`,
-                    top: `${point.y}%`,
-                    width: `${size}rem`,
-                    height: `${size}rem`,
-                    "--drift-x": `${(seeded(point.number, 8) - 0.5) * 8}px`,
-                    "--drift-y": `${(seeded(point.number, 9) - 0.5) * 9}px`,
-                    "--float-delay": `${seeded(point.number, 10) * -4.8}s`,
-                    "--float-duration": `${5.4 + seeded(point.number, 11) * 3.6}s`,
-                  } as CSSProperties}
-                  onClick={() => setSelectedNumber(point.number)}
-                >
-                  <span className={`network-node-glow ${ballTone(point.number)}`} />
-                  <span className={`lotto-ball ${ballTone(point.number)} network-node-ball`}>
-                    {point.number}
-                  </span>
-                </button>
-              );
-            })}
+                return (
+                  <button
+                    key={node.number}
+                    type="button"
+                    draggable={false}
+                    aria-pressed={active}
+                    aria-label={`${node.number}번 연관 번호 보기`}
+                    className={`network-node-button ${active ? "active" : node.related ? "related" : "muted"}`}
+                    style={
+                      {
+                        left: `${(node.x / WIDTH) * 100}%`,
+                        top: `${(node.y / HEIGHT) * 100}%`,
+                        width: size,
+                        height: size,
+                      } as CSSProperties
+                    }
+                    onClick={() => setSelectedNumber(node.number)}
+                    onPointerDown={(event) => handlePointerDown(event, node.number)}
+                    onDragStart={(event) => event.preventDefault()}
+                  >
+                    <span
+                      draggable={false}
+                      className={`lotto-ball ${ballTone(node.number)} network-node-disc`}
+                    >
+                      {node.number}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
+
+          <Card className="border-stone-200/80 shadow-none">
+            <CardContent className="grid gap-3 p-4 sm:grid-cols-4">
+              <div className="rounded-2xl border border-stone-200/80 bg-stone-50/80 p-4">
+                <p className="text-sm text-stone-500">선택 번호</p>
+                <strong className="mt-2 block text-2xl">{selectedNumber}번</strong>
+              </div>
+              <div className="rounded-2xl border border-stone-200/80 bg-stone-50/80 p-4">
+                <p className="text-sm text-stone-500">최강 파트너</p>
+                <strong className="mt-2 block text-2xl">
+                  {strongestLink
+                    ? strongestLink.source === selectedNumber
+                      ? `${strongestLink.target}번`
+                      : `${strongestLink.source}번`
+                    : "-"}
+                </strong>
+              </div>
+              <div className="rounded-2xl border border-stone-200/80 bg-stone-50/80 p-4">
+                <p className="text-sm text-stone-500">누적 연결 수</p>
+                <strong className="mt-2 block text-2xl">
+                  {selectedNeighborhood?.totalConnectionCount ?? 0}회
+                </strong>
+              </div>
+              <div className="rounded-2xl border border-stone-200/80 bg-stone-50/80 p-4">
+                <p className="text-sm text-stone-500">평균 연결 강도</p>
+                <strong className="mt-2 block text-2xl">
+                  {(averageStrength * 100).toFixed(1)}%
+                </strong>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         <div className="space-y-4">
@@ -241,70 +444,35 @@ export function NumberNetworkMap({
               <Badge variant="secondary" className="w-fit">
                 선택 번호 {selectedNumber}번
               </Badge>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div className="rounded-2xl border border-stone-200/80 bg-stone-50/80 p-4">
-                  <p className="text-sm text-stone-500">최강 파트너</p>
-                  <strong className="mt-2 block text-2xl">
-                    {strongestLink
-                      ? strongestLink.source === selectedNumber
-                        ? `${strongestLink.target}번`
-                        : `${strongestLink.source}번`
-                      : "-"}
-                  </strong>
-                </div>
-                <div className="rounded-2xl border border-stone-200/80 bg-stone-50/80 p-4">
-                  <p className="text-sm text-stone-500">누적 연결 수</p>
-                  <strong className="mt-2 block text-2xl">
-                    {selectedNeighborhood?.totalConnectionCount ?? 0}회
-                  </strong>
-                </div>
-                <div className="rounded-2xl border border-stone-200/80 bg-stone-50/80 p-4">
-                  <p className="text-sm text-stone-500">상위 평균 강도</p>
-                  <strong className="mt-2 block text-2xl">
-                    {(averageStrength * 100).toFixed(1)}%
-                  </strong>
-                </div>
-              </div>
               <CardTitle className="text-2xl">가장 강한 연관 번호</CardTitle>
               <CardDescription>
-                같은 회차에 함께 포함된 횟수 기준 상위 연결입니다.
+                상위 10개 연관 번호를 바로 눌러서 네트워크를 다시 볼 수 있습니다.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-2">
-              {selectedNeighborhood?.strongestLinks.map((connection) => {
-                const partner =
-                  connection.source === selectedNumber
-                    ? connection.target
-                    : connection.source;
-                return (
-                  <button
-                    key={`${selectedNumber}-${partner}`}
-                    type="button"
-                    className="network-side-item"
-                    onClick={() => setSelectedNumber(partner)}
-                  >
-                    <span className={`bar-badge ${ballTone(partner)}`}>{partner}</span>
-                    <div className="network-side-copy">
-                      <strong>{partner}번</strong>
-                      <p>{connection.count}회 함께 등장</p>
-                    </div>
-                    <Badge variant="outline">
-                      {(connection.normalizedWeight * 100).toFixed(1)}%
-                    </Badge>
-                  </button>
-                );
-              })}
-            </CardContent>
-          </Card>
+            <CardContent className="space-y-3">
+              <div className="network-top-balls network-top-balls-prominent">
+                {selectedNeighborhood?.strongestLinks.slice(0, 10).map((connection) => {
+                  const partner =
+                    connection.source === selectedNumber
+                      ? connection.target
+                      : connection.source;
 
-          <Card className="border-stone-200/80 shadow-none">
-            <CardHeader>
-              <CardTitle className="text-xl">맵 읽는 법</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm leading-6 text-stone-600">
-              <p>선택한 번호는 중심으로 이동하고 자주 함께 나온 번호일수록 가까이 붙습니다.</p>
-              <p>선이 굵을수록 같은 회차에 함께 들어온 횟수가 더 많습니다.</p>
-              <p>연관이 약한 번호는 바깥으로 밀려나서 묶음과 주변부가 한눈에 구분됩니다.</p>
+                  return (
+                    <button
+                      key={`top-ball-${partner}`}
+                      type="button"
+                      className="network-top-ball-chip"
+                      onClick={() => setSelectedNumber(partner)}
+                    >
+                      <span className={`lotto-ball ${ballTone(partner)}`}>{partner}</span>
+                      <span className="network-top-ball-meta">{connection.count}회</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-sm leading-6 text-stone-500">
+                보라색으로 더 굵게 보이는 선이 현재 번호와의 상위 10개 연관입니다.
+              </p>
             </CardContent>
           </Card>
         </div>

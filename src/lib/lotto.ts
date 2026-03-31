@@ -434,7 +434,7 @@ export function buildCoOccurrenceMap(draws: LottoDraw[]) {
             connection.source === number || connection.target === number,
         )
         .sort((left, right) => right.count - left.count)
-        .slice(0, 8);
+        .slice(0, 10);
 
       return {
         number,

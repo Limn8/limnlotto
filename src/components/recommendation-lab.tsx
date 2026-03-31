@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
-import { NumberStat, formatCompactNumber } from "@/lib/lotto";
+import { NumberConnection, NumberStat, formatCompactNumber } from "@/lib/lotto";
 
 type RuleKey =
   | "frequency"
@@ -92,11 +92,13 @@ function hasConsecutive(numbers: number[]) {
 type RecommendationLabProps = {
   stats: NumberStat[];
   latestWinningNumbers: number[];
+  connections: NumberConnection[];
 };
 
 export function RecommendationLab({
   stats,
   latestWinningNumbers,
+  connections,
 }: RecommendationLabProps) {
   const [selectedRules, setSelectedRules] = useState<RuleKey[]>([
     "frequency",
@@ -105,9 +107,19 @@ export function RecommendationLab({
   const [candidatePoolSize, setCandidatePoolSize] = useState(18);
   const [oddRange, setOddRange] = useState<[number, number]>([2, 4]);
   const [sumRange, setSumRange] = useState<[number, number]>([95, 185]);
+  const [pairMinFloor, setPairMinFloor] = useState(0);
+  const [pairMaxFloor, setPairMaxFloor] = useState(20);
   const [allowConsecutive, setAllowConsecutive] = useState(true);
   const [excludeLatestWinners, setExcludeLatestWinners] = useState(false);
   const [recentMode, setRecentMode] = useState<"all" | "active" | "quiet">("all");
+
+  const connectionCountMap = new Map<string, number>();
+  let strongestPairCount = 0;
+  connections.forEach((connection) => {
+    const key = `${Math.min(connection.source, connection.target)}-${Math.max(connection.source, connection.target)}`;
+    connectionCountMap.set(key, connection.count);
+    strongestPairCount = Math.max(strongestPairCount, connection.count);
+  });
 
   const toggleRule = (rule: RuleKey) => {
     setSelectedRules((current) =>
@@ -136,10 +148,21 @@ export function RecommendationLab({
     const oddCount = candidate.filter((value) => value % 2 === 1).length;
     const total = candidate.reduce((sum, value) => sum + value, 0);
     const bands = new Set(candidate.map((value) => Math.floor((value - 1) / 10)));
+    const pairCounts: number[] = [];
+    for (let left = 0; left < candidate.length; left += 1) {
+      for (let right = left + 1; right < candidate.length; right += 1) {
+        const key = `${candidate[left]}-${candidate[right]}`;
+        pairCounts.push(connectionCountMap.get(key) ?? 0);
+      }
+    }
+    const minPairCount = Math.min(...pairCounts);
+    const maxPairCount = Math.max(...pairCounts);
     if (oddCount < oddRange[0] || oddCount > oddRange[1]) continue;
     if (total < sumRange[0] || total > sumRange[1]) continue;
     if (!allowConsecutive && hasConsecutive(candidate)) continue;
     if (bands.size < 3) continue;
+    if (minPairCount < pairMinFloor) continue;
+    if (maxPairCount < pairMaxFloor) continue;
     const signature = candidate.join(",");
     if (combinations.some((combo) => combo.join(",") === signature)) continue;
     combinations.push(candidate);
@@ -310,6 +333,40 @@ export function RecommendationLab({
               </div>
 
               <Separator />
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label>조합 내 최소 연관횟수 하한</Label>
+                  <Badge variant="secondary">{pairMinFloor}회</Badge>
+                </div>
+                <Slider
+                  min={0}
+                  max={Math.max(strongestPairCount, 1)}
+                  step={1}
+                  value={[pairMinFloor]}
+                  onValueChange={(value) => setPairMinFloor(value[0] ?? 0)}
+                />
+                <p className="text-sm text-stone-500">
+                  조합 안에서 가장 덜 같이 나온 번호쌍도 최소 {pairMinFloor}회 이상 함께 나온 조합만 허용합니다.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label>조합 내 최대 연관횟수 하한</Label>
+                  <Badge variant="secondary">{pairMaxFloor}회</Badge>
+                </div>
+                <Slider
+                  min={0}
+                  max={Math.max(strongestPairCount, 1)}
+                  step={1}
+                  value={[pairMaxFloor]}
+                  onValueChange={(value) => setPairMaxFloor(value[0] ?? 0)}
+                />
+                <p className="text-sm text-stone-500">
+                  조합 안에서 가장 자주 같이 나온 번호쌍이 최소 {pairMaxFloor}회 이상인 조합만 남깁니다.
+                </p>
+              </div>
 
               <div className="space-y-3">
                 <Label>후보군 상위 6개</Label>

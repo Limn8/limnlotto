@@ -57,6 +57,10 @@ function ballTone(number: number) {
   return "ball-green";
 }
 
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
 export function LottoDashboard({
   draws,
   stats,
@@ -65,13 +69,24 @@ export function LottoDashboard({
   const [sortKey, setSortKey] = useState<NumberSortKey>("number");
   const [descending, setDescending] = useState(false);
   const [tab, setTab] = useState("numbers");
+  const [showDetailBars, setShowDetailBars] = useState(false);
   const sortedStats = sortNumberStats(stats, sortKey, descending);
   const numericValues = sortedStats.map((stat) =>
     typeof stat[sortKey] === "number" ? Number(stat[sortKey]) : 0,
   );
-  const maxValue = Math.max(...numericValues, 1);
-  const minValue = Math.min(...numericValues, 0);
+  const rawMaxValue = Math.max(...numericValues, 1);
+  const rawMinValue = Math.min(...numericValues);
+  const rawRange = Math.max(rawMaxValue - rawMinValue, 1);
+  const spreadRatio = (rawMaxValue - rawMinValue) / Math.max(Math.abs(rawMaxValue), 1);
+  const lowerPaddingRatio = spreadRatio < 0.2 ? 0.88 : spreadRatio < 0.35 ? 0.7 : 0;
+  const minValue = Math.max(0, rawMinValue - (rawMaxValue - rawMinValue) * lowerPaddingRatio);
+  const maxValue = rawMaxValue;
   const valueRange = Math.max(maxValue - minValue, 1);
+  const verticalMinValue =
+    spreadRatio < 0.4
+      ? rawMaxValue - rawRange * 1.12
+      : rawMinValue - rawRange * 0.08;
+  const verticalRange = Math.max(rawMaxValue - verticalMinValue, 1);
   const latestDraw = draws.at(-1);
   const recentDraws = [...draws].reverse().slice(0, 8);
   const topByFrequency = [...stats]
@@ -137,7 +152,9 @@ export function LottoDashboard({
             </div>
             <div className="flex flex-wrap gap-3">
               <Button asChild className="text-white">
-                <Link href="/draws">회차 순 번호 보기</Link>
+                <Link href="/draws" className="text-white">
+                  회차 순 번호 보기
+                </Link>
               </Button>
               <Button variant="outline" asChild>
                 <a href="#recommendation">추천 조합으로 이동</a>
@@ -300,8 +317,9 @@ export function LottoDashboard({
                     {sortedStats.map((stat) => {
                       const numericValue =
                         typeof stat[sortKey] === "number" ? Number(stat[sortKey]) : 0;
-                      const normalized = (numericValue - minValue) / valueRange;
-                      const height = 18 + Math.pow(normalized, 0.72) * 82;
+                      const normalized = (numericValue - verticalMinValue) / verticalRange;
+                      const emphasized = clamp(Math.pow(normalized, 0.45), 0, 1);
+                      const height = 38 + emphasized * 62;
 
                       return (
                         <div key={`column-${stat.number}`} className="number-bar-column">
@@ -324,40 +342,50 @@ export function LottoDashboard({
 
               <Separator />
 
-              <div className="space-y-3">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <p className="text-sm leading-6 text-stone-500">
                   세로 막대형 도표라서 번호별 상대적인 차이를 한 화면에서 빠르게 읽기
                   좋습니다. 아래 목록은 같은 값을 카드형으로 다시 보여줘서 정확한 수치를
                   확인하기 쉽게 둔 영역입니다.
                 </p>
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={() => setShowDetailBars((current) => !current)}
+                >
+                  {showDetailBars ? "아래 목록 접기" : "아래 목록 펼치기"}
+                </Button>
               </div>
 
-              {sortedStats.map((stat) => {
-                const numericValue =
-                  typeof stat[sortKey] === "number" ? Number(stat[sortKey]) : 0;
-                const normalized = (numericValue - minValue) / valueRange;
-                const width = 12 + Math.pow(normalized, 0.78) * 88;
-                return (
-                  <div key={stat.number} className="grid gap-3 rounded-2xl border border-stone-200/70 bg-stone-50/70 p-3 md:grid-cols-[140px_minmax(0,1fr)_88px] md:items-center">
-                    <div className="flex items-center gap-3">
-                      <span className={`bar-badge ${ballTone(stat.number)}`}>{stat.number}</span>
-                      <div>
-                        <strong>{stat.number}번</strong>
-                        <p className="text-sm text-stone-500">{stat.currentTrendLabel}</p>
+              {showDetailBars
+                ? sortedStats.map((stat) => {
+                    const numericValue =
+                      typeof stat[sortKey] === "number" ? Number(stat[sortKey]) : 0;
+                    const normalized = (numericValue - minValue) / valueRange;
+                    const emphasized = clamp(Math.pow(normalized, 0.42), 0, 1);
+                    const width = 42 + emphasized * 58;
+                    return (
+                      <div key={stat.number} className="grid gap-3 rounded-2xl border border-stone-200/70 bg-stone-50/70 p-3 md:grid-cols-[140px_minmax(0,1fr)_88px] md:items-center">
+                        <div className="flex items-center gap-3">
+                          <span className={`bar-badge ${ballTone(stat.number)}`}>{stat.number}</span>
+                          <div>
+                            <strong>{stat.number}번</strong>
+                            <p className="text-sm text-stone-500">{stat.currentTrendLabel}</p>
+                          </div>
+                        </div>
+                        <div className="relative h-4 overflow-hidden rounded-full bg-stone-200">
+                          <div
+                            className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-orange-500 to-amber-400"
+                            style={{ width: `${width}%` }}
+                          />
+                        </div>
+                        <div className="text-sm font-semibold text-stone-700">
+                          {formatMetric(sortKey, stat)}
+                        </div>
                       </div>
-                    </div>
-                    <div className="relative h-4 overflow-hidden rounded-full bg-stone-200">
-                      <div
-                        className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-orange-500 to-amber-400"
-                        style={{ width: `${width}%` }}
-                      />
-                    </div>
-                    <div className="text-sm font-semibold text-stone-700">
-                      {formatMetric(sortKey, stat)}
-                    </div>
-                  </div>
-                );
-              })}
+                    );
+                  })
+                : null}
             </CardContent>
           </Card>
         </TabsContent>
@@ -457,6 +485,7 @@ export function LottoDashboard({
         <RecommendationLab
           stats={stats}
           latestWinningNumbers={latestDraw?.numbers ?? []}
+          connections={coOccurrenceMap.connections}
         />
       </div>
 
@@ -507,6 +536,18 @@ export function LottoDashboard({
           ))}
         </CardContent>
       </Card>
+
+      <p className="pb-4 text-center text-sm text-stone-500">
+        제작:
+        <a
+          href="https://litt.ly/limn8"
+          target="_blank"
+          rel="noreferrer"
+          className="ml-1 font-semibold text-stone-700 underline underline-offset-4"
+        >
+          경기이음온학교 임현우
+        </a>
+      </p>
     </div>
   );
 }
