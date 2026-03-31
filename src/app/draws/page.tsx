@@ -1,18 +1,19 @@
 import Link from "next/link";
 
-import { analyzeDraw, formatCompactNumber, formatKoreanDate, getLottoDataset } from "@/lib/lotto";
-
-function colorClass(number: number) {
-  if (number <= 10) return "ball-yellow";
-  if (number <= 20) return "ball-blue";
-  if (number <= 30) return "ball-red";
-  if (number <= 40) return "ball-gray";
-  return "ball-green";
-}
+import { DrawSearchList } from "@/components/draw-search-list";
+import { getLottoDataset } from "@/lib/lotto";
 
 export default function DrawsPage() {
   const dataset = getLottoDataset();
-  const draws = [...dataset.draws].reverse();
+  const draws = [...dataset.draws]
+    .reverse()
+    .map((draw) => ({
+      drawNo: draw.drawNo,
+      date: draw.date,
+      numbers: draw.numbers,
+      bonusNo: draw.bonusNo,
+      firstPrize: draw.divisions[0]?.prize ?? 0,
+    }));
 
   return (
     <div className="page-shell">
@@ -36,42 +37,7 @@ export default function DrawsPage() {
       </section>
 
       <section className="surface-panel">
-        <div className="draw-list">
-          {draws.map((draw) => {
-            const shape = analyzeDraw(draw);
-
-            return (
-              <Link key={draw.drawNo} href={`/draws/${draw.drawNo}`} className="draw-list-item">
-                <div className="draw-list-head">
-                  <div>
-                    <strong>{draw.drawNo}회</strong>
-                    <p>{formatKoreanDate(draw.date)}</p>
-                  </div>
-                  <div className="draw-metrics">
-                    <span>합계 {shape.sum}</span>
-                    <span>
-                      홀짝 {shape.oddCount}:{shape.evenCount}
-                    </span>
-                    <span>
-                      1등 {formatCompactNumber(draw.divisions[0]?.prize ?? 0)}원
-                    </span>
-                  </div>
-                </div>
-                <div className="ball-row">
-                  {draw.numbers.map((value) => (
-                    <span key={value} className={`lotto-ball ${colorClass(value)}`}>
-                      {value}
-                    </span>
-                  ))}
-                  <span className="ball-plus">+</span>
-                  <span className={`lotto-ball ${colorClass(draw.bonusNo)} bonus-ball`}>
-                    {draw.bonusNo}
-                  </span>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
+        <DrawSearchList draws={draws} />
       </section>
     </div>
   );
