@@ -1,4 +1,5 @@
 import rawLottoData from "@/data/lotto-data.json";
+import rawWinningStoreData from "@/data/winning-stores.json";
 
 export type LottoDivision = {
   rank: number;
@@ -27,6 +28,33 @@ export type LottoDataset = {
   generatedAt: string;
   latestDrawNo: number;
   draws: LottoDraw[];
+};
+
+export type WinningStore = {
+  name: string;
+  address: string;
+  combination: string;
+  lat: number;
+  lng: number;
+};
+
+export type WinningStoreDraw = {
+  drawNo: number;
+  stores: WinningStore[];
+};
+
+export type WinningStoreDataset = {
+  generatedAt: string;
+  latestDrawNo: number;
+  draws: WinningStoreDraw[];
+};
+
+export type WinningStoreSpot = {
+  key: string;
+  lat: number;
+  lng: number;
+  hitCount: number;
+  draws: number[];
 };
 
 export type NumberSortKey =
@@ -178,9 +206,14 @@ export const sortOptions: Array<{
 ];
 
 const dataset = rawLottoData as LottoDataset;
+const winningStoreDataset = rawWinningStoreData as WinningStoreDataset;
 
 export function getLottoDataset() {
   return dataset;
+}
+
+export function getWinningStoreDataset() {
+  return winningStoreDataset;
 }
 
 function average(values: number[]) {
@@ -459,6 +492,33 @@ export function formatKoreanDate(isoDate: string) {
     month: "long",
     day: "numeric",
   }).format(new Date(isoDate));
+}
+
+export function buildWinningStoreHotspots(draws: WinningStoreDraw[]) {
+  const hotspotMap = new Map<string, WinningStoreSpot>();
+
+  draws.forEach((draw) => {
+    draw.stores.forEach((store) => {
+      const key = `${store.name}__${store.address}__${store.lat.toFixed(5)}__${store.lng.toFixed(5)}`;
+      const current = hotspotMap.get(key);
+
+      if (current) {
+        current.hitCount += 1;
+        current.draws.push(draw.drawNo);
+        return;
+      }
+
+      hotspotMap.set(key, {
+        key,
+        lat: store.lat,
+        lng: store.lng,
+        hitCount: 1,
+        draws: [draw.drawNo],
+      });
+    });
+  });
+
+  return [...hotspotMap.values()].sort((left, right) => right.hitCount - left.hitCount);
 }
 
 export function formatCompactNumber(value: number) {

@@ -161,6 +161,9 @@ export function LottoDashboard({
                 </Link>
               </Button>
               <Button variant="outline" asChild>
+                <Link href="/stores">명당 지도 보기</Link>
+              </Button>
+              <Button variant="outline" asChild>
                 <a href="#recommendation">추천 조합으로 이동</a>
               </Button>
             </div>

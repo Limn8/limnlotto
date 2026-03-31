@@ -29,6 +29,9 @@ export default function DrawsPage() {
           <Link href="/" className="inline-link">
             메인 대시보드로 돌아가기
           </Link>
+          <Link href="/stores" className="inline-link">
+            명당 지도 보기
+          </Link>
         </div>
       </section>
 

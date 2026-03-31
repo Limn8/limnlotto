@@ -2,11 +2,17 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const DATA_PATH = path.join(process.cwd(), "src/data/lotto-data.json");
+const WINNING_STORES_PATH = path.join(
+  process.cwd(),
+  "src/data/winning-stores.json",
+);
 const OFFICIAL_ENDPOINT =
   "https://www.dhlottery.co.kr/common.do?method=getLottoNumber&drwNo=";
 const FALLBACK_ALL_ENDPOINT = "https://smok95.github.io/lotto/results/all.json";
 const FALLBACK_LATEST_ENDPOINT =
   "https://smok95.github.io/lotto/results/latest.json";
+const WINNING_STORE_ENDPOINT =
+  "https://smok95.github.io/lotto/winning-stores";
 
 function normalizeDraw(record, source) {
   if (!record) {
@@ -77,6 +83,15 @@ async function safeReadCurrentData() {
   }
 }
 
+async function safeReadCurrentWinningStores() {
+  try {
+    const text = await readFile(WINNING_STORES_PATH, "utf8");
+    return JSON.parse(text);
+  } catch {
+    return { generatedAt: null, latestDrawNo: 0, draws: [] };
+  }
+}
+
 async function fetchJson(url, init) {
   const response = await fetch(url, {
     ...init,
@@ -132,6 +147,59 @@ async function fetchFallbackLatest() {
   return normalizeDraw(record, "backup-smok95");
 }
 
+function normalizeWinningStore(record = {}) {
+  const name = String(record.name ?? "").trim();
+  const address = String(record.address ?? "").trim();
+  const combination = String(record.combination ?? "").trim();
+  const lat = Number(record.lat);
+  const lng = Number(record.lng);
+
+  if (!name || !address || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return null;
+  }
+
+  return {
+    name,
+    address,
+    combination,
+    lat,
+    lng,
+  };
+}
+
+async function fetchWinningStores(drawNo) {
+  try {
+    const records = await fetchJson(`${WINNING_STORE_ENDPOINT}/${drawNo}.json`);
+
+    if (!Array.isArray(records)) {
+      return [];
+    }
+
+    return records.map(normalizeWinningStore).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+async function mapWithConcurrency(items, limit, task) {
+  const results = Array(items.length);
+  let cursor = 0;
+
+  async function worker() {
+    while (cursor < items.length) {
+      const currentIndex = cursor;
+      cursor += 1;
+      results[currentIndex] = await task(items[currentIndex], currentIndex);
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, () => worker()),
+  );
+
+  return results;
+}
+
 function validateDraws(draws) {
   for (let index = 0; index < draws.length; index += 1) {
     const draw = draws[index];
@@ -159,6 +227,7 @@ function validateDraws(draws) {
 
 async function main() {
   const current = await safeReadCurrentData();
+  const currentWinningStores = await safeReadCurrentWinningStores();
   const fallbackLatest = await fetchFallbackLatest();
 
   if (!fallbackLatest) {
@@ -194,17 +263,60 @@ async function main() {
   draws.sort((a, b) => a.drawNo - b.drawNo);
   validateDraws(draws);
 
+  let winningStoreDraws = Array.isArray(currentWinningStores.draws)
+    ? [...currentWinningStores.draws]
+    : [];
+  const winningStoreMap = new Map(
+    winningStoreDraws.map((draw) => [draw.drawNo, draw]),
+  );
+
+  const missingWinningStoreDraws = [];
+  for (let drawNo = 262; drawNo <= (draws.at(-1)?.drawNo ?? 0); drawNo += 1) {
+    if (!winningStoreMap.has(drawNo)) {
+      missingWinningStoreDraws.push(drawNo);
+    }
+  }
+
+  const fetchedWinningStoreDraws = await mapWithConcurrency(
+    missingWinningStoreDraws,
+    24,
+    async (drawNo) => ({
+      drawNo,
+      stores: await fetchWinningStores(drawNo),
+    }),
+  );
+
+  winningStoreDraws.push(...fetchedWinningStoreDraws);
+
+  winningStoreDraws = winningStoreDraws
+    .filter((draw) => draw.drawNo >= 262)
+    .sort((a, b) => a.drawNo - b.drawNo);
+
   const payload = {
     generatedAt: new Date().toISOString(),
     latestDrawNo: draws.at(-1)?.drawNo ?? 0,
     draws,
   };
 
+  const winningStorePayload = {
+    generatedAt: new Date().toISOString(),
+    latestDrawNo: winningStoreDraws.at(-1)?.drawNo ?? 0,
+    draws: winningStoreDraws,
+  };
+
   await mkdir(path.dirname(DATA_PATH), { recursive: true });
   await writeFile(DATA_PATH, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  await writeFile(
+    WINNING_STORES_PATH,
+    `${JSON.stringify(winningStorePayload, null, 2)}\n`,
+    "utf8",
+  );
 
   console.log(
     `Updated lotto dataset through draw ${payload.latestDrawNo} (${payload.draws.length} draws)`,
+  );
+  console.log(
+    `Updated winning store dataset through draw ${winningStorePayload.latestDrawNo} (${winningStorePayload.draws.length} draws)`,
   );
 }
 
