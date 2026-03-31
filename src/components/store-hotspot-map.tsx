@@ -137,15 +137,20 @@ export function StoreHotspotMap({ hotspots }: StoreHotspotMapProps) {
                   r={radius}
                   fill={hotspotFill(spot.hitCount)}
                   className="store-hotspot"
-                  onMouseEnter={(event) =>
+                />
+                <circle
+                  cx={point.x}
+                  cy={point.y}
+                  r={Math.max(radius + 6, 12)}
+                  className="store-hotspot-hitbox"
+                  onPointerEnter={(event) =>
                     updateTooltipPosition(event.clientX, event.clientY, spot.hitCount)
                   }
-                  onMouseMove={(event) =>
+                  onPointerMove={(event) =>
                     updateTooltipPosition(event.clientX, event.clientY, spot.hitCount)
                   }
-                  onMouseLeave={() => setHoveredSpot(null)}
-                >
-                </circle>
+                  onPointerLeave={() => setHoveredSpot(null)}
+                />
               </g>
             );
           })}

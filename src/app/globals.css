@@ -456,6 +456,7 @@ input[type="number"] {
 
 .store-map-tooltip {
   position: absolute;
+  z-index: 20;
   pointer-events: none;
   transform: translateY(-100%);
   border-radius: 999px;
@@ -487,6 +488,11 @@ input[type="number"] {
   stroke: rgba(255, 255, 255, 0.88);
   stroke-width: 0.8;
   opacity: 0.92;
+  cursor: pointer;
+}
+
+.store-hotspot-hitbox {
+  fill: transparent;
   cursor: pointer;
 }
 
