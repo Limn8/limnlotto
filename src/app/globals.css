@@ -419,31 +419,21 @@ input[type="number"] {
 .store-map-svg {
   width: 100%;
   height: auto;
-  aspect-ratio: 760 / 900;
+  aspect-ratio: 760 / 956;
 }
 
-.korea-silhouette {
-  fill: rgba(79, 96, 134, 0.08);
-  stroke: rgba(79, 96, 134, 0.18);
-  stroke-width: 8;
-  stroke-linejoin: round;
-}
-
-.korea-shadow-line {
-  fill: none;
-  stroke: rgba(79, 96, 134, 0.12);
-  stroke-width: 6;
-  stroke-linecap: round;
+.korea-reference-map {
+  opacity: 0.72;
 }
 
 .store-hotspot-glow {
-  fill: rgba(245, 158, 11, 0.18);
+  fill: rgba(245, 158, 11, 0.12);
 }
 
 .store-hotspot {
   stroke: rgba(255, 255, 255, 0.88);
-  stroke-width: 2;
-  opacity: 0.94;
+  stroke-width: 1.5;
+  opacity: 0.62;
 }
 
 .network-link {

@@ -499,6 +499,14 @@ export function buildWinningStoreHotspots(draws: WinningStoreDraw[]) {
 
   draws.forEach((draw) => {
     draw.stores.forEach((store) => {
+      const isOnlineStore =
+        /인터넷|online|dhlottery|동행복권\(/i.test(store.name) ||
+        /인터넷|online|dhlottery|동행복권\(/i.test(store.address);
+
+      if (isOnlineStore || !Number.isFinite(store.lat) || !Number.isFinite(store.lng)) {
+        return;
+      }
+
       const key = `${store.name}__${store.address}__${store.lat.toFixed(5)}__${store.lng.toFixed(5)}`;
       const current = hotspotMap.get(key);
 
