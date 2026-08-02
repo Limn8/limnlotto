@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-26T03:39:36.945Z",
-  "latestDrawNo": 1234,
+  "generatedAt": "2026-08-02T03:37:00.148Z",
+  "latestDrawNo": 1235,
   "draws": [
     {
       "drawNo": 1,
@@ -57997,6 +57997,53 @@
         "auto": 12,
         "semiAuto": 0,
         "manual": 6
+      },
+      "source": "backup-smok95"
+    },
+    {
+      "drawNo": 1235,
+      "date": "2026-08-01T00:00:00.000Z",
+      "numbers": [
+        6,
+        7,
+        11,
+        15,
+        39,
+        43
+      ],
+      "bonusNo": 20,
+      "totalSalesAmount": 115445069000,
+      "divisions": [
+        {
+          "rank": 1,
+          "prize": 3090961625,
+          "winners": 9
+        },
+        {
+          "rank": 2,
+          "prize": 56541981,
+          "winners": 82
+        },
+        {
+          "rank": 3,
+          "prize": 1621701,
+          "winners": 2859
+        },
+        {
+          "rank": 4,
+          "prize": 50000,
+          "winners": 154048
+        },
+        {
+          "rank": 5,
+          "prize": 5000,
+          "winners": 2585719
+        }
+      ],
+      "winnersCombination": {
+        "auto": 7,
+        "semiAuto": 0,
+        "manual": 2
       },
       "source": "backup-smok95"
     }
